@@ -1,0 +1,124 @@
+name: Build CSV Player
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Build Windows executable
+      run: |
+        pyinstaller --onefile --windowed --name="CSV作品播放器" --icon=icon.ico main.py
+      shell: cmd
+    
+    - name: Upload Windows artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: csv-player-windows
+        path: dist/CSV作品播放器.exe
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Build macOS executable
+      run: |
+        pyinstaller --onefile --windowed --name="CSV作品播放器" main.py
+    
+    - name: Create macOS App Bundle
+      run: |
+        mkdir -p "CSV作品播放器.app/Contents/MacOS"
+        mkdir -p "CSV作品播放器.app/Contents/Resources"
+        cp dist/CSV作品播放器 "CSV作品播放器.app/Contents/MacOS/"
+        
+        # Create Info.plist
+        cat > "CSV作品播放器.app/Contents/Info.plist" << EOF
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleName</key>
+            <string>CSV作品播放器</string>
+            <key>CFBundleDisplayName</key>
+            <string>CSV作品播放器</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.csvplayer.app</string>
+            <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundleExecutable</key>
+            <string>CSV作品播放器</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.13</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+        
+        # Create DMG
+        hdiutil create -srcfolder "CSV作品播放器.app" -volname "CSV作品播放器" -fs HFS+ -fsargs "-c c=64,a=16,e=16" -format UDZO "CSV作品播放器.dmg"
+    
+    - name: Upload macOS artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: csv-player-macos
+        path: CSV作品播放器.dmg
+
+  release:
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: csv-player-windows
+        path: ./windows/
+    
+    - name: Download macOS artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: csv-player-macos
+        path: ./macos/
+    
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./windows/CSV作品播放器.exe
+          ./macos/CSV作品播放器.dmg
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
