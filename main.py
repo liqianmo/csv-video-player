@@ -342,7 +342,25 @@ class CSVPlayer(QMainWindow):
         self.status_bar.showMessage(f"正在加载视频: {work_name}")
         
         try:
-            # 直接播放在线视频
+            # 检查 URL 格式
+            parsed_url = urlparse(url)
+            if not parsed_url.scheme or not parsed_url.netloc:
+                QMessageBox.warning(self, "警告", "视频链接格式不正确")
+                return
+            
+            # 对于某些视频平台，直接在浏览器中打开可能更好
+            if any(platform in url.lower() for platform in ['bilibili', 'youtube', 'youku', 'iqiyi']):
+                reply = QMessageBox.question(
+                    self, "播放选择", 
+                    f"检测到视频平台链接，建议在浏览器中打开。\n\n是否在浏览器中打开？\n\n点击 'No' 尝试直接播放",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.Yes
+                )
+                if reply == QMessageBox.Yes:
+                    webbrowser.open(url)
+                    return
+            
+            # 尝试直接播放
             media_content = QMediaContent(QUrl(url))
             self.media_player.setMedia(media_content)
             self.media_player.play()
@@ -352,8 +370,12 @@ class CSVPlayer(QMainWindow):
             
             self.status_bar.showMessage(f"正在播放: {work_name}")
             
+            # 设置超时检查
+            QTimer.singleShot(10000, self.check_playback_status)
+            
         except Exception as e:
-            QMessageBox.critical(self, "播放错误", f"无法播放视频:\n{str(e)}")
+            error_msg = f"无法播放视频:\n{str(e)}\n\n建议:\n1. 检查网络连接\n2. 尝试在浏览器中打开\n3. 确认视频链接有效"
+            QMessageBox.critical(self, "播放错误", error_msg)
             self.status_bar.showMessage("播放失败")
         
     def open_in_browser(self):
@@ -387,9 +409,30 @@ class CSVPlayer(QMainWindow):
         else:
             self.play_pause_btn.setText("▶️")
             
+    def check_playback_status(self):
+        """检查播放状态"""
+        if self.media_player.state() == QMediaPlayer.StoppedState and self.media_player.mediaStatus() == QMediaPlayer.InvalidMedia:
+            QMessageBox.warning(
+                self, "播放提示", 
+                "视频可能无法直接播放。\n\n可能的原因:\n1. 视频格式不支持\n2. 需要特殊播放器\n3. 网络问题\n\n建议在浏览器中打开链接。"
+            )
+    
     def on_media_error(self, error):
         """媒体播放错误"""
-        QMessageBox.critical(self, "播放错误", f"视频播放失败:\n{self.media_player.errorString()}")
+        error_messages = {
+            QMediaPlayer.NoError: "无错误",
+            QMediaPlayer.ResourceError: "资源错误 - 视频文件无法访问",
+            QMediaPlayer.FormatError: "格式错误 - 不支持的视频格式",
+            QMediaPlayer.NetworkError: "网络错误 - 请检查网络连接",
+            QMediaPlayer.AccessDeniedError: "访问被拒绝 - 可能需要权限验证",
+            QMediaPlayer.ServiceMissingError: "服务缺失 - 缺少必要的多媒体组件"
+        }
+        
+        error_msg = error_messages.get(error, f"未知错误 ({error})")
+        detailed_msg = f"视频播放失败:\n\n错误类型: {error_msg}\n详细信息: {self.media_player.errorString()}\n\n解决建议:\n1. 尝试在浏览器中打开\n2. 检查网络连接\n3. 确认视频链接有效"
+        
+        QMessageBox.critical(self, "播放错误", detailed_msg)
+        self.status_bar.showMessage(f"播放失败: {error_msg}")
         
     def closeEvent(self, event):
         """程序关闭事件"""

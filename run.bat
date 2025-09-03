@@ -1,18 +1,12 @@
 @echo off
-chcp 65001 >nul
-echo CSV作品播放器 - Windows启动脚本
-echo ==========================================
-
-python --version >nul 2>&1
+echo 启动 CSV 作品播放器...
+python main.py
 if errorlevel 1 (
-    echo 错误: 未找到Python
-    echo 请先安装Python 3.8或更高版本
-    echo 下载地址: https://www.python.org/downloads/
+    echo.
+    echo 程序运行出错，请检查:
+    echo 1. Python 是否正确安装
+    echo 2. 是否已运行 install_windows.bat 安装依赖
+    echo 3. 查看上方的错误信息
+    echo.
     pause
-    exit /b 1
 )
-
-echo 启动应用程序...
-python run.py
-
-pause
